@@ -18,6 +18,7 @@
 - [Visão Geral](#-visão-geral)
 - [Características](#-características)
 - [Arquitetura](#-arquitetura)
+- [Docker Hub - Imagens Oficiais](#-docker-hub---imagens-oficiais)
 - [Pré-requisitos](#-pré-requisitos)
 - [Instalação e Configuração](#-instalação-e-configuração)
 - [Uso](#-uso)
@@ -109,6 +110,383 @@ feature-pagamentos/
     ├── 📦 requirements.txt         # Dependências Python
     └── 📁 templates/
         └── 🌐 index.html           # Interface web
+```
+
+## 🐳 Docker Hub - Imagens Oficiais
+
+<div align="center">
+
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-bpsbrunopinheiro/pagamentos--service-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com/repository/docker/bpsbrunopinheiro/pagamentos-service/tags)
+
+📦 **Repositório Oficial**: `bpsbrunopinheiro/pagamentos-service`  
+🔗 **Link**: https://hub.docker.com/repository/docker/bpsbrunopinheiro/pagamentos-service/tags
+
+</div>
+
+### 🏷️ Versões Disponíveis
+
+| Tag      | Versão       | Status        | Tamanho | Segurança     | Recomendação    |
+| -------- | ------------ | ------------- | ------- | ------------- | --------------- |
+| `latest` | Mais recente | ✅ Ativa      | ~85MB   | 🛡️ Segura     | Desenvolvimento |
+| `v1.0.1` | Estável      | ✅ LTS        | ~85MB   | 🛡️ Verificada | **Produção**    |
+| `v1.0.0` | Inicial      | ⚠️ Deprecated | ~120MB  | ❌ Vulnerável | Não usar        |
+
+### 🚀 Deploy com Docker Hub
+
+#### 🔧 1. Deploy Rápido - Versão Latest
+
+```bash
+# 1. Fazer pull da imagem latest
+docker pull bpsbrunopinheiro/pagamentos-service:latest
+
+# 2. Executar container standalone
+docker run -d \
+  --name pagamentos-service \
+  -p 8787:5000 \
+  -e DB_HOST=seu-mysql-host \
+  -e DB_USER=seu-usuario \
+  -e DB_PASSWORD=sua-senha \
+  -e DB_NAME=ecommerce_db \
+  bpsbrunopinheiro/pagamentos-service:latest
+
+# 3. Verificar status
+docker ps --filter "name=pagamentos-service"
+
+# 4. Testar aplicação
+curl http://localhost:8787/status
+```
+
+#### 🏭 2. Deploy Produção - Versão v1.0.1 (Recomendada)
+
+```bash
+# 1. Fazer pull da versão específica
+docker pull bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 2. Verificar integridade da imagem
+docker inspect bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 3. Executar em modo produção
+docker run -d \
+  --name pagamentos-prod \
+  --restart unless-stopped \
+  --memory="512m" \
+  --cpus="0.5" \
+  -p 8787:5000 \
+  -e FLASK_ENV=production \
+  -e DB_HOST=mysql-prod.exemplo.com \
+  -e DB_USER=app_user \
+  -e DB_PASSWORD=senha_segura \
+  -e DB_NAME=ecommerce_db \
+  --health-cmd="curl -f http://localhost:5000/status || exit 1" \
+  --health-interval=30s \
+  --health-retries=3 \
+  --health-start-period=40s \
+  --health-timeout=10s \
+  bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 4. Monitorar logs
+docker logs -f pagamentos-prod
+```
+
+### 🔄 Deploy com Docker Compose
+
+#### 📋 Configuração docker-compose.yml
+
+```yaml
+# docker-compose.hub.yml
+version: '3.8'
+
+services:
+  pagamentos-service:
+    image: bpsbrunopinheiro/pagamentos-service:v1.0.1
+    container_name: pagamentos-hub
+    restart: unless-stopped
+    ports:
+      - '8787:5000'
+    environment:
+      - FLASK_ENV=production
+      - DB_HOST=mysql-db
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-ecommerce_db}
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    networks:
+      - pagamentos-net
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:5000/status']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mysql-db:
+    image: mysql:8.0-debian
+    container_name: mysql-hub
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${DB_NAME:-ecommerce_db}
+      MYSQL_USER: ${DB_USER:-admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-admin123}
+    volumes:
+      - mysql_data_hub:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - pagamentos-net
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          'localhost',
+          '-u',
+          'root',
+          '-p${DB_ROOT_PASSWORD:-root123}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data_hub:
+    driver: local
+
+networks:
+  pagamentos-net:
+    driver: bridge
+```
+
+#### 🚀 Executar com Docker Compose
+
+```bash
+# 1. Criar arquivo de configuração
+cat > docker-compose.hub.yml << 'EOF'
+# Cole o conteúdo do docker-compose.yml acima
+EOF
+
+# 2. Criar arquivo .env
+cat > .env.hub << 'EOF'
+DB_NAME=ecommerce_db
+DB_USER=admin
+DB_PASSWORD=admin123
+DB_ROOT_PASSWORD=root123
+EOF
+
+# 3. Executar o stack
+docker-compose -f docker-compose.hub.yml --env-file .env.hub up -d
+
+# 4. Verificar status
+docker-compose -f docker-compose.hub.yml ps
+
+# 5. Acompanhar logs
+docker-compose -f docker-compose.hub.yml logs -f
+```
+
+### 🔍 Verificação de Deploy
+
+#### ✅ Health Checks Automáticos
+
+```bash
+# Verificar saúde do container
+docker inspect pagamentos-prod --format='{{.State.Health.Status}}'
+
+# Logs de health check
+docker inspect pagamentos-prod --format='{{range .State.Health.Log}}{{.Output}}{{end}}'
+
+# Status detalhado
+docker ps --filter "name=pagamentos" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+#### 🔧 Testes de Funcionalidade
+
+```bash
+# 1. Health Check da aplicação
+curl -f http://localhost:8787/status && echo "✅ Aplicação OK" || echo "❌ Aplicação com problema"
+
+# 2. Teste da interface web
+curl -f http://localhost:8787/ | grep -q "Pagamentos" && echo "✅ Interface OK" || echo "❌ Interface com problema"
+
+# 3. Teste da API
+curl -f http://localhost:8787/formas_pagamento && echo "✅ API OK" || echo "❌ API com problema"
+
+# 4. Teste completo de funcionalidade
+./scripts/test-api.sh  # Se disponível
+```
+
+### 🔄 Upgrade de Versões
+
+#### 📈 Atualizar de v1.0.0 para v1.0.1
+
+```bash
+# 1. Parar container atual
+docker stop pagamentos-prod
+
+# 2. Backup dos dados (se necessário)
+docker run --rm \
+  -v pagamentos_mysql_data:/data:ro \
+  -v "$(pwd)/backup:/backup" \
+  alpine tar czf "/backup/mysql-backup-$(date +%Y%m%d).tar.gz" -C /data .
+
+# 3. Fazer pull da nova versão
+docker pull bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 4. Remover container antigo
+docker rm pagamentos-prod
+
+# 5. Executar nova versão
+docker run -d \
+  --name pagamentos-prod \
+  --restart unless-stopped \
+  -p 8787:5000 \
+  -v pagamentos_mysql_data:/data \
+  bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 6. Verificar se a atualização foi bem-sucedida
+docker logs pagamentos-prod
+curl http://localhost:8787/status
+```
+
+#### 🔄 Rolling Update com Docker Compose
+
+```bash
+# 1. Atualizar docker-compose.yml com nova versão
+sed -i 's/v1.0.0/v1.0.1/g' docker-compose.hub.yml
+
+# 2. Fazer pull da nova imagem
+docker-compose -f docker-compose.hub.yml pull
+
+# 3. Realizar rolling update
+docker-compose -f docker-compose.hub.yml up -d --no-deps pagamentos-service
+
+# 4. Verificar se o update foi bem-sucedido
+docker-compose -f docker-compose.hub.yml ps
+```
+
+### 🛡️ Segurança das Imagens
+
+#### 🔍 Verificação de Vulnerabilidades
+
+```bash
+# 1. Scan completo com Docker Scout
+docker scout cves bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 2. Verificação rápida
+docker scout quickview bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 3. Comparar versões
+docker scout compare bpsbrunopinheiro/pagamentos-service:v1.0.0 \
+  --to bpsbrunopinheiro/pagamentos-service:v1.0.1
+
+# 4. Análise alternativa com Trivy
+trivy image bpsbrunopinheiro/pagamentos-service:v1.0.1
+```
+
+#### 📋 Relatório de Segurança v1.0.1
+
+```bash
+# Gerar relatório detalhado
+docker scout cves bpsbrunopinheiro/pagamentos-service:v1.0.1 \
+  --format json > security-report-v1.0.1.json
+
+# Resumo executivo
+docker scout quickview bpsbrunopinheiro/pagamentos-service:v1.0.1 \
+  --format table
+```
+
+### 📊 Monitoramento e Métricas
+
+#### 📈 Monitoramento de Performance
+
+```bash
+# 1. Estatísticas de uso
+docker stats pagamentos-prod --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
+
+# 2. Logs estruturados
+docker logs pagamentos-prod --since="1h" --follow
+
+# 3. Health check contínuo
+watch -n 30 'curl -s http://localhost:8787/status | jq .'
+```
+
+#### 🔍 Debug e Troubleshooting
+
+```bash
+# 1. Acessar container em execução
+docker exec -it pagamentos-prod /bin/sh
+
+# 2. Verificar variáveis de ambiente
+docker exec pagamentos-prod env | grep -E "DB_|FLASK_"
+
+# 3. Verificar conectividade de rede
+docker exec pagamentos-prod ping mysql-db
+
+# 4. Verificar logs detalhados
+docker logs pagamentos-prod --details --timestamps
+```
+
+### 🚀 Scripts de Automação
+
+#### 📋 Script de Deploy Automatizado
+
+```bash
+#!/bin/bash
+# deploy-hub.sh - Deploy automatizado do Docker Hub
+
+VERSION=${1:-v1.0.1}
+ENVIRONMENT=${2:-production}
+
+echo "🚀 Iniciando deploy da versão $VERSION em ambiente $ENVIRONMENT"
+
+# 1. Pull da imagem
+echo "📦 Fazendo pull da imagem..."
+docker pull bpsbrunopinheiro/pagamentos-service:$VERSION
+
+# 2. Verificar se a imagem existe
+if ! docker image inspect bpsbrunopinheiro/pagamentos-service:$VERSION >/dev/null 2>&1; then
+    echo "❌ Erro: Imagem não encontrada"
+    exit 1
+fi
+
+# 3. Parar container atual (se existir)
+if docker ps -q --filter "name=pagamentos-$ENVIRONMENT" | grep -q .; then
+    echo "⏹️ Parando container atual..."
+    docker stop pagamentos-$ENVIRONMENT
+    docker rm pagamentos-$ENVIRONMENT
+fi
+
+# 4. Executar novo container
+echo "🔄 Iniciando novo container..."
+docker run -d \
+    --name pagamentos-$ENVIRONMENT \
+    --restart unless-stopped \
+    -p 8787:5000 \
+    bpsbrunopinheiro/pagamentos-service:$VERSION
+
+# 5. Aguardar inicialização
+echo "⏳ Aguardando inicialização..."
+sleep 30
+
+# 6. Verificar saúde
+if curl -f http://localhost:8787/status >/dev/null 2>&1; then
+    echo "✅ Deploy concluído com sucesso!"
+    docker ps --filter "name=pagamentos-$ENVIRONMENT"
+else
+    echo "❌ Deploy falhou - verificar logs"
+    docker logs pagamentos-$ENVIRONMENT
+    exit 1
+fi
+```
+
+```bash
+# Dar permissão de execução
+chmod +x deploy-hub.sh
+
+# Executar deploy
+./deploy-hub.sh v1.0.1 production
 ```
 
 ## 🔧 Pré-requisitos
