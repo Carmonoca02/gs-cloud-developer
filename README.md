@@ -2,6 +2,11 @@
 
 Este projeto implementa um microserviço containerizado para gerenciamento de lojas de um e-commerce, utilizando **Docker**, **Flask**, **MySQL** e boas práticas de DevOps.
 
+# Docker Hub
+ 
+# Link da imagem no Docker hub - [william201192/lojas-service](https://hub.docker.com/repository/docker/william201192/lojas-service/general)
+
+
 ## 🛡️ **ALERTA DE SEGURANÇA**
 
 ⚠️ **Use sempre a versão segura**: `william201192/lojas-service:v1.0.1`  
