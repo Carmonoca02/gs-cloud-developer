@@ -1,0 +1,31 @@
+# Ignorar arquivos e pastas do Git
+.git
+.gitignore
+
+# Ignorar arquivos do Docker que não fazem parte da imagem
+# A imagem não precisa saber como ela é orquestrada.
+.dockerignore
+docker-compose.yml
+docker-compose.dev.yml
+docker-compose.prod.yml
+
+# Se você estiver construindo com o Dockerfile de produção,
+# pode ignorar o de desenvolvimento.
+dockerfile.dev
+
+# Ignorar arquivos de ambiente e segredos para não serem incluídos no build
+.env
+.env.*
+
+# Ignorar pastas de ambiente virtual e caches do Python
+# O Dockerfile deve criar um ambiente limpo.
+venv
+.venv
+env
+__pycache__
+*.pyc
+
+# Ignorar documentação e arquivos de configuração de IDE
+README.md
+.vscode
+.idea
